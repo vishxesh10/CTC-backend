@@ -3,50 +3,74 @@ from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
 from pydantic import BaseModel, EmailStr
 import os
 from dotenv import load_dotenv
+from fastapi.middleware.cors import CORSMiddleware
 
 # Load .env variables
 load_dotenv()
 
 app = FastAPI()
 
-# Email configuration (using Gmail SMTP as example)
+
+origins = [
+    "http://localhost:3000",  # your Next.js frontend
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],  # allow GET, POST, OPTIONS etc.
+    allow_headers=["*"],
+)
+
+# Email configuration
 conf = ConnectionConfig(
     MAIL_USERNAME=os.getenv("EMAIL_USER"),
     MAIL_PASSWORD=os.getenv("EMAIL_PASS"),
     MAIL_FROM=os.getenv("EMAIL_USER"),
     MAIL_PORT=587,
     MAIL_SERVER="smtp.gmail.com",
-    MAIL_TLS=True,
-    MAIL_SSL=False,
+    MAIL_STARTTLS=True,   
+    MAIL_SSL_TLS=False, 
     USE_CREDENTIALS=True
 )
 
-# Data model for incoming request
+# Updated Order model to include productId and price
 class Order(BaseModel):
     name: str
     email: EmailStr
     address: str
     product: str
+    productId: str
+    price: float
     quantity: int
+
+@app.get("/")
+async def root():
+    return {"message": "CTC Backend is running! 🚀",
+            "info": "working at the /send-order endpoint to send order emails."}
+
 
 @app.post("/send-order")
 async def send_order(order: Order, background_tasks: BackgroundTasks):
-    # Email content/ template
+    # Email content
     body = f"""
-    📦 New Order Received:
+📦 New Order Received:
 
-    Product: {order.product}
-    Quantity: {order.quantity}
-    
-    Address: {order.address}
+Product: {order.product}
+Product ID: {order.productId}
+Quantity: {order.quantity}
+Price per unit: ₹{order.price}
 
-    Customer: {order.name}
-    Email: {order.email}
-    """
+Shipping Address: {order.address}
+
+Customer: {order.name}
+Email: {order.email}
+"""
 
     message = MessageSchema(
         subject=f"New Order: {order.product}",
-        recipients=["jerryaryan123@email.com"], #sellers mail
+        recipients=["jerryaryan123@email.com"],  # seller's email
         body=body,
         subtype="plain"
     )
